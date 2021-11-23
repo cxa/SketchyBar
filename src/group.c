@@ -99,6 +99,12 @@ void group_calculate_bounds(struct group* group, uint32_t x, uint32_t y, bool rt
 }
 
 void group_draw(struct group* group, CGContextRef context) {
+  struct background shadow_bg = group->members[0]->background;
+  shadow_bg.bounds.origin.x += 3;
+  shadow_bg.bounds.origin.y -= 3;
+  background_set_color(&shadow_bg, 0x99000000);
+  background_set_border_color(&shadow_bg, 0x99000000);
+  background_draw(&shadow_bg, context);
   background_draw(&group->members[0]->background, context);
 }
 
