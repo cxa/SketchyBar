@@ -170,6 +170,23 @@ void background_calculate_bounds(struct background* background, uint32_t x, uint
     image_calculate_bounds(&background->image, x, y);
 }
 
+static inline void set_rect_radii(CGMutablePathRef path, CGRect rect, CGFloat topLeft, CGFloat topRight, CGFloat bottomRight, CGFloat bottomLeft) {
+  CGFloat minX = CGRectGetMinX(rect);
+  CGFloat maxX = CGRectGetMaxX(rect);
+  CGFloat minY = CGRectGetMinY(rect);
+  CGFloat maxY = CGRectGetMaxY(rect);
+
+  CGPathMoveToPoint(path, NULL, minX + bottomLeft, minY);
+  CGPathAddArcToPoint(path, NULL, minX, minY, minX, maxY, bottomLeft);
+  CGPathAddLineToPoint(path, NULL, minX, maxY - topLeft);
+  CGPathAddArcToPoint(path, NULL, minX, maxY, maxX, maxY, topLeft);
+  CGPathAddLineToPoint(path, NULL, maxX - topRight, maxY);
+  CGPathAddArcToPoint(path, NULL, maxX, maxY, maxX, minY, topRight);
+  CGPathAddLineToPoint(path, NULL, maxX, minY + bottomRight);
+  CGPathAddArcToPoint(path, NULL, maxX, minY, minX, minY, bottomRight);
+  CGPathCloseSubpath(path);
+}
+
 static void draw_rect(CGContextRef context, CGRect region, struct color* fill_color, uint32_t corner_radius, uint32_t line_width, struct color* stroke_color) {
   CGContextSetLineWidth(context, line_width);
   if (stroke_color) CGContextSetRGBStrokeColor(context, stroke_color->r, stroke_color->g, stroke_color->b, stroke_color->a);
@@ -177,9 +194,17 @@ static void draw_rect(CGContextRef context, CGRect region, struct color* fill_co
 
   CGMutablePathRef path = CGPathCreateMutable();
   CGRect inset_region = CGRectInset(region, (float)(line_width) / 2.f, (float)(line_width) / 2.f);
-  if (corner_radius > inset_region.size.height / 2.f || corner_radius > inset_region.size.width / 2.f)
-    corner_radius = inset_region.size.height > inset_region.size.width ? inset_region.size.width / 2.f : inset_region.size.height / 2.f; 
-  CGPathAddRoundedRect(path, NULL, inset_region, corner_radius, corner_radius);
+  if (corner_radius > 0xFF) {
+    uint8_t tl = (corner_radius >> 24) & 0xFF;
+    uint8_t tr = (corner_radius >> 16) & 0xFF;
+    uint8_t br = (corner_radius >> 8) & 0xFF;
+    uint8_t bl = corner_radius & 0xFF;
+    set_rect_radii(path, inset_region, tl, tr, br, bl);
+  } else {
+    if (corner_radius > inset_region.size.height / 2.f || corner_radius > inset_region.size.width / 2.f)
+      corner_radius = inset_region.size.height > inset_region.size.width ? inset_region.size.width / 2.f : inset_region.size.height / 2.f;
+    CGPathAddRoundedRect(path, NULL, inset_region, corner_radius, corner_radius);
+  }
   CGContextAddPath(context, path);
   CGContextDrawPath(context, kCGPathFillStroke);
   CFRelease(path);
